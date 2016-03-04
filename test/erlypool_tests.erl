@@ -7,7 +7,7 @@
 
 minmax_test() ->
     % FIFO
-    erlypool:start(test1, [{min_size, 3}, {max_size, 5}, {strategy, fifo}, {module, erlypool_testpool}]),
+    erlypool:start(test1, [{min_size, 3}, {max_size, 5}, {strategy, fifo}, {module, erlypool_testpool}], null),
     {ok, object1} = erlypool:borrow(test1),
     {ok, object2} = erlypool:borrow(test1),
     {ok, object3} = erlypool:borrow(test1),
@@ -16,14 +16,14 @@ minmax_test() ->
     {error, max_size_exceeded} = erlypool:borrow(test1),
     erlypool:stop(test1),
     % LIFO
-    erlypool:start(test1, [{min_size, 3}, {max_size, 5}, {module, erlypool_testpool}]),
+    erlypool:start(test1, [{min_size, 3}, {max_size, 5}, {module, erlypool_testpool}], []),
     {ok, object3} = erlypool:borrow(test1),
     {ok, object2} = erlypool:borrow(test1),
     {ok, object1} = erlypool:borrow(test1),
     erlypool:stop(test1).
 
 borrow_release_fifo_test() ->
-    erlypool:start(test2, [{min_size, 3}, {max_size, 5}, {strategy, fifo}, {module, erlypool_testpool}]),
+    erlypool:start(test2, [{min_size, 3}, {max_size, 5}, {strategy, fifo}, {module, erlypool_testpool}], null),
     {ok, object1} = erlypool:borrow(test2),
     {ok, object2} = erlypool:borrow(test2),
     {ok, object3} = erlypool:borrow(test2),
@@ -52,7 +52,7 @@ borrow_release_fifo_test() ->
     erlypool:stop(test2).
 
 borrow_release_lifo_test() ->
-    erlypool:start(test3, [{min_size, 5}, {max_size, 5}, {strategy, lifo}, {module, erlypool_testpool}]),
+    erlypool:start(test3, [{min_size, 5}, {max_size, 5}, {strategy, lifo}, {module, erlypool_testpool}], null),
     lists:foreach(fun(_) ->
         {ok, object5} = erlypool:borrow(test3),
         {ok, object4} = erlypool:borrow(test3),
@@ -70,7 +70,7 @@ borrow_release_lifo_test() ->
     , erlypool:stop(test3).
 
 borrow_broken_test() ->
-    erlypool:start(test4, [{min_size, 3}, {max_size, 6}, {strategy, fifo}, {module, erlypool_testpool}]),
+    erlypool:start(test4, [{min_size, 3}, {max_size, 6}, {strategy, fifo}, {module, erlypool_testpool}], null),
     {ok, object1} = erlypool:borrow(test4),
     {ok, object2} = erlypool:borrow(test4),
     {ok, object3} = erlypool:borrow(test4),
@@ -88,7 +88,7 @@ borrow_broken_test() ->
 multiprocess_test_() ->
     {timeout, 60,
         fun() ->
-            erlypool:start(test5, [{min_size, 3}, {module, erlypool_testpool}, {test_on_borrow, false}]),
+            erlypool:start(test5, [{min_size, 3}, {module, erlypool_testpool}, {test_on_borrow, false}], null),
             Pids = lists:map(fun(_) ->
                 {Pid, _Tag} = spawn_monitor(fun() ->
                     erlypool:borrow(test5, 10)

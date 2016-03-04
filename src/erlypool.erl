@@ -19,7 +19,7 @@
 -author("Eugene Khrustalev <eugene.khrustalev@gmail.com>").
 -behaviour(gen_server).
 
--export([start/2, start_link/2, stop/1, borrow/1, borrow/2, release/2]).
+-export([start/3, start_link/3, stop/1, borrow/1, borrow/2, release/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3, format_status/2]).
 
 
@@ -27,7 +27,7 @@
 %% API functions
 %% ===================================================================
 
--spec start(PoolName, Opts) -> {ok, Pid} | {error, Reason} when
+-spec start(PoolName, PoolOpts, CreateOpts) -> {ok, Pid} | {error, Reason} when
     PoolName :: atom() | {local, Name} | {global, GlobalName} | {via, Module, ViaName},
     Name :: atom(),
     GlobalName :: term(),
@@ -35,18 +35,19 @@
     Module :: atom(),
     Pid :: pid(),
     Reason :: term(),
-    Opts :: proplists:proplist().
+    PoolOpts :: proplists:proplist(),
+    CreateOpts :: any().
 %%
 %% @doc Start a new standalone pool
 %%
-start(PoolName, Opts) when is_atom(PoolName) ->
-    start({local, PoolName}, Opts);
+start(PoolName, PoolOpts, CreateOpts) when is_atom(PoolName) ->
+    start({local, PoolName}, PoolOpts, CreateOpts);
 
-start(PoolName, Opts) ->
-    gen_server:start(PoolName, ?MODULE, Opts, []).
+start(PoolName, PoolOpts, CreateOpts) ->
+    gen_server:start(PoolName, ?MODULE, [PoolOpts, CreateOpts], []).
 
 
--spec start_link(PoolName, Opts) -> {ok, Pid} | {error, Reason} when
+-spec start_link(PoolName, PoolOpts, CreateOpts) -> {ok, Pid} | {error, Reason} when
     PoolName :: atom() | {local, Name} | {global, GlobalName} | {via, Module, ViaName},
     Name :: atom(),
     GlobalName :: term(),
@@ -54,15 +55,16 @@ start(PoolName, Opts) ->
     Module :: atom(),
     Pid :: pid(),
     Reason :: term(),
-    Opts :: proplists:proplist().
+    PoolOpts :: proplists:proplist(),
+    CreateOpts :: any().
 %%
 %% @doc Start a new pool within a supervision tree
 %%
-start_link(PoolName, Opts) when is_atom(PoolName) ->
-    start_link({local, PoolName}, Opts);
+start_link(PoolName, PoolOpts, CreateOpts) when is_atom(PoolName) ->
+    start_link({local, PoolName}, PoolOpts, CreateOpts);
 
-start_link(PoolName, Opts) ->
-    gen_server:start_link(PoolName, ?MODULE, Opts, []).
+start_link(PoolName, PoolOpts, CreateOpts) ->
+    gen_server:start_link(PoolName, ?MODULE, [PoolOpts, CreateOpts], []).
 
 
 -spec stop(PoolRef) -> ok when
@@ -127,27 +129,25 @@ release(PoolRef, Object) ->
 %% gen_server callbacks
 %% ===================================================================
 
--record(state, {min, max, strategy = lifo, module, modstate, free = [], freefun, test_on_borrow, borrowed = []}).
+-record(state, {min, max, strategy = lifo, module, opts, free = [], freefun, test_on_borrow, borrowed = []}).
 
 %% @private
-init(Opts) ->
+init([PoolOpts, CreateOpts]) ->
     process_flag(trap_exit, true),
     % State params
-    Min = proplists:get_value(min_size, Opts, 0),
-    Max = proplists:get_value(max_size, Opts, unlimited),
-    Strategy = proplists:get_value(strategy, Opts, lifo),
-    Module = proplists:get_value(module, Opts),
-    {ok, ModState} = erlang:apply(Module, init, []),
+    Min = proplists:get_value(min_size, PoolOpts, 0),
+    Max = proplists:get_value(max_size, PoolOpts, unlimited),
+    Strategy = proplists:get_value(strategy, PoolOpts, lifo),
+    Module = proplists:get_value(module, PoolOpts),
     FreeFun = case Strategy of
                   lifo -> fun(Obj, List) -> [Obj | List] end;
                   fifo -> fun(Obj, List) -> List ++ [Obj] end
               end,
-    Test = proplists:get_value(test_on_borrow, Opts, true),
+    Test = proplists:get_value(test_on_borrow, PoolOpts, true),
     % Initialize minimum number of objects
     State = borrow_free(#state{
-        min = Min, max = Max, strategy = Strategy, module = Module, modstate = ModState, freefun = FreeFun, test_on_borrow = Test
+        min = Min, max = Max, strategy = Strategy, module = Module, opts = CreateOpts, freefun = FreeFun, test_on_borrow = Test
     }, Min),
-    % io:format("Init: free=~w, borrowed=~w~n", [State#state.free, State#state.borrowed]),
     {ok, State}.
 
 %% @private
@@ -156,7 +156,6 @@ handle_call(borrow, {Pid, _}, State) ->
         {error, Reason} ->
             {reply, {error, Reason}, State};
         {Object, NewState} ->
-            % io:format("Borrow: free=~w, borrowed=~w~n", [NewState#state.free, NewState#state.borrowed]),
             {reply, {ok, Object}, NewState}
     end;
 
@@ -167,7 +166,6 @@ handle_call(_Request, _From, State) ->
 %% @private
 handle_cast({release, Object}, State) ->
     NewState = release_object(State, Object),
-    % io:format("Release: free=~w, borrowed=~w~n", [NewState#state.free, NewState#state.borrowed]),
     {noreply, NewState};
 
 %% @private
@@ -192,12 +190,13 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% @private
-format_status(_Opt, [_PDict, #state{min = Min, max = Max, strategy = Strategy, module = Module, free = Free, test_on_borrow = Test, borrowed = Borrowed}]) ->
+format_status(_Opt, [_PDict, #state{min = Min, max = Max, strategy = Strategy, module = Module, opts = Opts, free = Free, test_on_borrow = Test, borrowed = Borrowed}]) ->
     {state, [
         {min, Min},
         {max, Max},
         {strategy, Strategy},
         {module, Module},
+        {create_opts, Opts},
         {test_on_borrow, Test},
         {free, Free},
         {borrowed, Borrowed}
@@ -210,16 +209,16 @@ format_status(_Opt, [_PDict, #state{min = Min, max = Max, strategy = Strategy, m
 borrow_free(State, 0) ->
     State;
 
-borrow_free(#state{module = Module, modstate = ModState, free = Free, freefun = FreeFun} = State, Num) ->
-    {ok, Object, NewModState} = erlang:apply(Module, create, [ModState]),
-    NewState = State#state{free = FreeFun(Object, Free), modstate = NewModState},
+borrow_free(#state{module = Module, opts = CreateOpts, free = Free, freefun = FreeFun} = State, Num) ->
+    {ok, Object} = erlang:apply(Module, create, [CreateOpts]),
+    NewState = State#state{free = FreeFun(Object, Free)},
     borrow_free(NewState, Num - 1).
 
 
-borrow_object(#state{max = Max, module = Module, modstate = ModState, free = [], borrowed = Borrowed} = State, Pid) when Max =:= unlimited; length(Borrowed) < Max ->
+borrow_object(#state{max = Max, module = Module, opts = CreateOpts, free = [], borrowed = Borrowed} = State, Pid) when Max =:= unlimited; length(Borrowed) < Max ->
     % Create a new object and monitor to the calling process
-    {ok, Object, NewModState} = erlang:apply(Module, create, [ModState]),
-    borrow_object(State#state{modstate = NewModState}, Pid, [], Object);
+    {ok, Object} = erlang:apply(Module, create, [CreateOpts]),
+    borrow_object(State, Pid, [], Object);
 
 borrow_object(#state{free = []}, _Pid) ->
     % Return error if the maximum number of borrowed objects is exceeded
@@ -229,10 +228,10 @@ borrow_object(#state{free = [Object | Free], test_on_borrow = false} = State, Pi
     % Just take a free object from the pool
     borrow_object(State, Pid, Free, Object);
 
-borrow_object(#state{module = Module, modstate = ModState, free = [Object | Free], test_on_borrow = true} = State, Pid) ->
-    case erlang:apply(Module, test, [Object, ModState]) of
-        {ok, NewModState} ->
-            borrow_object(State#state{modstate = NewModState}, Pid, Free, Object);
+borrow_object(#state{module = Module, free = [Object | Free], test_on_borrow = true} = State, Pid) ->
+    case erlang:apply(Module, test, [Object]) of
+        ok ->
+            borrow_object(State, Pid, Free, Object);
         _ ->
             % Remove broken object from the pool and retry
             borrow_object(State#state{free = Free}, Pid)
@@ -244,7 +243,7 @@ borrow_object(State, Pid, Free, Object) ->
     {Object, NewState}.
 
 
-release_object(#state{min = Min, module = Module, modstate = ModState, free = Free, freefun = FreeFun, borrowed = Borrowed} = State, ObjRef) ->
+release_object(#state{min = Min, module = Module, free = Free, freefun = FreeFun, borrowed = Borrowed} = State, ObjRef) ->
     case borrow_find([], Borrowed, ObjRef) of
         not_found ->
             State;
@@ -256,10 +255,10 @@ release_object(#state{min = Min, module = Module, modstate = ModState, free = Fr
                 true -> erlang:demonitor(Ref)
             end,
             % Reset object and put it back to the pool
-            {ok, ModState2} = erlang:apply(Module, reset, [Object, ModState]),
+            ok = erlang:apply(Module, reset, [Object]),
             Free2 = FreeFun(Object, Free),
-            {NewFree, NewModState} = close_object(Min, Free2, Module, ModState2),
-            State#state{modstate = NewModState, free = NewFree, borrowed = NewBorrowed}
+            NewFree = close_object(Min, Free2, Module),
+            State#state{free = NewFree, borrowed = NewBorrowed}
     end.
 
 
@@ -276,9 +275,9 @@ borrow_find(Acc, [H | Tail], Object) ->
     borrow_find(Acc ++ [H], Tail, Object).
 
 
-close_object(Min, List, _Module, ModState) when length(List) =< Min ->
-    {List, ModState};
+close_object(Min, List, _Module) when length(List) =< Min ->
+    List;
 
-close_object(Min, [Object | Tail], Module, ModState) ->
-    {ok, NewModState} = erlang:apply(Module, close, [Object, ModState]),
-    close_object(Min, Tail, Module, NewModState).
+close_object(Min, [Object | Tail], Module) ->
+    ok = erlang:apply(Module, close, [Object]),
+    close_object(Min, Tail, Module).

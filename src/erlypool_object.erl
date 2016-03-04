@@ -19,29 +19,19 @@
 -author("Eugene Khrustalev <eugene.khrustalev@gmail.com>").
 
 
--callback init() -> {ok, State} when
-    State    :: any().
+-callback create(CreateOpts) -> {ok, Object} | {error, Reason} when
+    CreateOpts :: any(),
+    Object     :: any(),
+    Reason     :: term().
 
--callback create(State) -> {ok, Object, NewState} | {error, Reason} when
-    State    :: any(),
-    NewState :: any(),
+-callback test(Object) -> ok | {error, Reason} when
     Object   :: any(),
     Reason   :: term().
 
--callback test(Object, State) -> {ok, NewState} | {error, Reason} when
+-callback reset(Object) -> ok | {error, Reason} when
     Object   :: any(),
-    State    :: any(),
-    NewState :: any(),
     Reason   :: term().
 
--callback reset(Object, State) -> {ok, NewState} | {error, Reason} when
+-callback close(Object) -> ok | {error, Reason} when
     Object   :: any(),
-    State    :: any(),
-    NewState :: any(),
-    Reason   :: term().
-
--callback close(Object, State) -> {ok, NewState} | {error, Reason} when
-    Object   :: any(),
-    State    :: any(),
-    NewState :: any(),
     Reason   :: term().
