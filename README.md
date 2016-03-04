@@ -1,16 +1,16 @@
 ## A simple and easy to use generic pooling library for Erlang
 
-[![Build Status](https://api.travis-ci.org/eugenehr/erlypool.svg?branch=master)](https://travis-ci.org/eugenehr/erlypool)
-
 An OTP application/gen_server to provide a simple way for pooling objects with heavy initialization,
 e.g. database connections, gen_server instances, channels or something else.
+
+[![Build Status](https://api.travis-ci.org/eugenehr/erlypool.svg?branch=master)](https://travis-ci.org/eugenehr/erlypool)
 
 ## Usage
 
 ### 1. Standalone pool
 
 #### example.erl
-```erl-sh
+```erlang
 %% erlypool:start(PoolName, PoolOpts, CreateOpts) - create a new pool
 {ok, _Pid} = erlypool:start(db_pool, 
 	[% Pool options
@@ -32,7 +32,7 @@ erlypool:release(Conn, Conn)
 
 
 #### db_conn.erl
-```erl-sh
+```erlang
 -behaviour(erlypool_object).
 -export([create/1, test/1, reset/1, close/1]).
 
@@ -70,7 +70,7 @@ close(Conn) ->
 
 #### example.config
 
-```erl-sh
+```erlang
 [{erlypool, [{pools, [
     {pool1,
         [{min_size, 3}, {max_size, 50}, {strategy, lifo}, {module, erlypool_testpool}],
