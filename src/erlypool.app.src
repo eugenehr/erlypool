@@ -1,6 +1,6 @@
 {application, erlypool, [
     {description, "A generic object pool"},
-    {vsn, "1.0.1"},
+    {vsn, "1.1.1"},
     {maintainers, ["Eugene Khrustalev"]},
     {licenses, ["Apache 2.0"]},
     {links, [{"GitHub", "https://github.com/eugenehr/erlypool"}]},
