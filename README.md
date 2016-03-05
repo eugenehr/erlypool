@@ -27,7 +27,7 @@ e.g. database connections, gen_server instances, channels or something else.
 Conn = erlypool:borrow(db_pool),
 ...
 %% erlypool:release(PoolRef, Object) - release the object
-erlypool:release(Conn, Conn)
+erlypool:release(db_pool, Conn)
 ```
 
 
@@ -103,7 +103,7 @@ erl -config example
 | `min_size`       |    0       | The minimum number of active connections 
 | `max_size`       |`unlimited` | The maximum number of active connections or `unlimited` atom
 | `strategy`       |`lifo`      | How objects should be placed first or last in the pool
-| `module`         | -          | The name of the Erlang module which callbacks will be used to create and destroy objects. This parameter is required.
+| `module`         | -          | The name of the Erlang module which callbacks will be used to create and destroy objects. This parameter is required
 | `test_on_borrow` | `true`     | `true` to call test-callback before object will be returned from the pool
 
 
