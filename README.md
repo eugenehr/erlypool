@@ -102,7 +102,7 @@ erl -config example
 |------------------|:----------:|--------------
 | `min_size`       |    0       | The minimum number of active connections 
 | `max_size`       |`unlimited` | The maximum number of active connections or `unlimited` atom
-| `strategy`       |`lifo`      | How objects should be placed first or last in the pool
+| `strategy`       |`lifo`      | How objects should be placed first or last in the pool. 'lifo' or 'fifo'
 | `module`         | -          | The name of the Erlang module which callbacks will be used to create and destroy objects. This parameter is required
 | `test_on_borrow` | `true`     | `true` to call test-callback before object will be returned from the pool
 
